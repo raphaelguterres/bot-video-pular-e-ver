@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Course Bot</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Playwright + Brave CDP</p>
+          <h1>Video Course Bot</h1>
+        </div>
+        <span class="status-pill" id="statusPill">Parado</span>
+      </header>
+
+      <section class="control-panel">
+        <div class="section-title">
+          <span>Entrada</span>
+          <strong>Curso</strong>
+        </div>
+
+        <label class="field field-wide">
+          <span>Preset da plataforma</span>
+          <select id="platformPreset"></select>
+        </label>
+
+        <label class="field field-wide">
+          <span>URL do video ou curso</span>
+          <input id="startUrl" type="url" placeholder="https://www.coursera.org/..." autocomplete="off" />
+        </label>
+
+        <div class="section-title">
+          <span>Navegador</span>
+          <strong>Brave/CDP</strong>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            <span>CDP do Brave</span>
+            <input id="browserCdpUrl" type="text" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span>Caminho do Brave</span>
+            <input id="browserExecutablePath" type="text" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="section-title">
+          <span>Automacao</span>
+          <strong>Execucao</strong>
+        </div>
+
+        <div class="grid-3">
+          <label class="field">
+            <span>Seletor do video</span>
+            <input id="videoSelector" type="text" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span>Espera pelo proximo</span>
+            <input id="autoAdvanceWaitMs" type="number" min="1000" step="500" />
+          </label>
+
+          <label class="field">
+            <span>Intervalo</span>
+            <input id="pollIntervalMs" type="number" min="250" step="250" />
+          </label>
+
+          <label class="field">
+            <span>Tempo sem video</span>
+            <input id="nonVideoWaitMs" type="number" min="5000" step="5000" />
+          </label>
+        </div>
+
+        <div class="speed-row">
+          <label class="field speed-field">
+            <span>Velocidade</span>
+            <input id="playbackRate" type="range" min="0.25" max="4" step="0.25" />
+          </label>
+          <strong id="speedValue">1.00x</strong>
+        </div>
+
+        <label class="check-row">
+          <input id="useExistingBrowser" type="checkbox" />
+          <span>Usar aba nova no Brave ja aberto</span>
+        </label>
+
+        <label class="check-row">
+          <input id="stopOnAssessment" type="checkbox" />
+          <span>Pausar quando detectar prova ou quiz</span>
+        </label>
+
+        <label class="check-row">
+          <input id="autoAdvanceNonVideo" type="checkbox" />
+          <span>Avancar conteudo sem video apos espera</span>
+        </label>
+
+        <div class="button-row">
+          <button id="checkBrave" class="secondary" type="button">Verificar Brave</button>
+          <button id="openBrave" class="secondary" type="button">Abrir Brave CDP</button>
+          <button id="startBot" class="primary" type="button">Iniciar</button>
+          <button id="stopBot" class="danger" type="button" disabled>Parar</button>
+        </div>
+      </section>
+
+      <section class="monitor-panel">
+        <div class="metrics-grid">
+          <article class="metric">
+            <span>Conexao</span>
+            <strong id="connectionStatus">Nao verificada</strong>
+          </article>
+          <article class="metric">
+            <span>Videos concluidos</span>
+            <strong id="completedVideos">0</strong>
+          </article>
+          <article class="metric">
+            <span>Status</span>
+            <strong id="botStatus">Parado</strong>
+          </article>
+        </div>
+
+        <div class="assessment-panel" id="assessmentPanel">
+          <div>
+            <span>Avaliacao</span>
+            <strong id="assessmentTitle">Nenhuma prova detectada</strong>
+            <small id="assessmentUrl">-</small>
+          </div>
+          <span id="assessmentConfidence">0</span>
+        </div>
+
+        <div class="current-video">
+          <div>
+            <span>Video atual</span>
+            <strong id="currentTitle">Nenhum video monitorado</strong>
+            <small id="currentUrl">-</small>
+          </div>
+          <div class="time-readout" id="timeReadout">00:00 / 00:00</div>
+        </div>
+
+        <div class="progress-track">
+          <div id="progressBar" class="progress-fill"></div>
+        </div>
+
+        <div class="insight-grid">
+          <section class="history-panel">
+            <div class="panel-title">
+              <span>Historico</span>
+              <strong id="historySummary">0 aulas</strong>
+            </div>
+            <ul id="historyList" class="compact-list"></ul>
+          </section>
+
+          <section class="study-panel" id="studyPanel">
+            <div class="panel-title">
+              <span>Modo Estudo</span>
+              <strong id="studyTitle">Aguardando avaliacao</strong>
+            </div>
+            <small id="studyMeta">O guia aparece quando prova ou quiz for detectado.</small>
+            <ul id="studyChecklist" class="compact-list"></ul>
+            <ul id="studyPrompts" class="compact-list prompt-list"></ul>
+          </section>
+        </div>
+
+        <div class="log-header">
+          <span>Eventos</span>
+          <button id="clearLog" class="ghost" type="button">Limpar</button>
+        </div>
+        <pre id="eventLog" class="event-log"></pre>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

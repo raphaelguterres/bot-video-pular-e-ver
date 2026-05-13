@@ -1,0 +1,59 @@
+{
+  "name": "bot-video-pular-e-ver",
+  "version": "1.0.0",
+  "description": "Aplicativo desktop para detectar o fim de videos em cursos e avancar automaticamente.",
+  "author": "Local",
+  "main": "src/electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "cli": "node src/bot.js",
+    "cli:headed": "HEADLESS=false node src/bot.js",
+    "brave:debug": "powershell -ExecutionPolicy Bypass -File scripts/open-brave-debug.ps1",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:win:portable": "electron-builder --win portable",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.local.video-course-bot",
+    "productName": "Video Course Bot",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "scripts/**/*",
+      "config.example.json",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    }
+  }
+}

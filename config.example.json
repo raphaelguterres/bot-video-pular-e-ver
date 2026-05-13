@@ -1,0 +1,23 @@
+{
+  "startUrl": "https://www.coursera.org/learn/digital-forensics-essentials-dfe/lecture/OicBR/introduction",
+  "platformPreset": "coursera",
+  "headless": false,
+  "useExistingBrowser": true,
+  "browserCdpUrl": "http://127.0.0.1:9222",
+  "browserExecutablePath": "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+  "pollIntervalMs": 1000,
+  "autoAdvanceWaitMs": 8000,
+  "autoAdvanceNonVideo": true,
+  "nonVideoWaitMs": 45000,
+  "videoSelector": "video",
+  "playbackRate": 1,
+  "stopOnAssessment": true,
+  "nextButtonSelectors": [
+    "button[aria-label*='Proximo' i]",
+    "button[aria-label*='Next' i]",
+    "a[aria-label*='Proximo' i]",
+    "a[aria-label*='Next' i]",
+    ".next",
+    ".next-button"
+  ]
+}
