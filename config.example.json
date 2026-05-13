@@ -12,6 +12,7 @@
   "videoSelector": "video",
   "playbackRate": 1,
   "stopOnAssessment": true,
+  "simulationMode": false,
   "nextButtonSelectors": [
     "button[aria-label*='Proximo' i]",
     "button[aria-label*='Next' i]",

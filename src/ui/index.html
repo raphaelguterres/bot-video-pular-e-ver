@@ -8,107 +8,43 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Playwright + Brave CDP</p>
-          <h1>Video Course Bot</h1>
-        </div>
-        <span class="status-pill" id="statusPill">Parado</span>
-      </header>
-
-      <section class="control-panel">
-        <div class="section-title">
-          <span>Entrada</span>
-          <strong>Curso</strong>
+      <aside class="sidebar">
+        <div class="brand-block">
+          <span class="brand-mark">VC</span>
+          <div>
+            <p class="eyebrow">Desktop Automation</p>
+            <h1>Video Course Bot</h1>
+          </div>
         </div>
 
-        <label class="field field-wide">
-          <span>Preset da plataforma</span>
-          <select id="platformPreset"></select>
-        </label>
+        <nav class="sidebar-nav" aria-label="Navegacao">
+          <a href="#session">Sessao</a>
+          <a href="#settings">Configuracao</a>
+          <a href="#history">Historico</a>
+          <a href="#events">Eventos</a>
+        </nav>
 
-        <label class="field field-wide">
-          <span>URL do video ou curso</span>
-          <input id="startUrl" type="url" placeholder="https://www.coursera.org/..." autocomplete="off" />
-        </label>
-
-        <div class="section-title">
-          <span>Navegador</span>
-          <strong>Brave/CDP</strong>
+        <div class="sidebar-footer">
+          <button id="themeToggle" class="ghost full-width" type="button">Tema escuro</button>
+          <span class="status-pill" id="statusPill">Parado</span>
         </div>
+      </aside>
 
-        <div class="grid-2">
-          <label class="field">
-            <span>CDP do Brave</span>
-            <input id="browserCdpUrl" type="text" autocomplete="off" />
-          </label>
+      <section class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Brave CDP + Playwright</p>
+            <h2>Controle de sessão</h2>
+          </div>
+          <div class="button-row compact">
+            <button id="checkBrave" class="secondary" type="button">Verificar CDP</button>
+            <button id="openBrave" class="secondary" type="button">Abrir Brave</button>
+            <button id="startBot" class="primary" type="button">Iniciar</button>
+            <button id="stopBot" class="danger" type="button" disabled>Parar</button>
+          </div>
+        </header>
 
-          <label class="field">
-            <span>Caminho do Brave</span>
-            <input id="browserExecutablePath" type="text" autocomplete="off" />
-          </label>
-        </div>
-
-        <div class="section-title">
-          <span>Automacao</span>
-          <strong>Execucao</strong>
-        </div>
-
-        <div class="grid-3">
-          <label class="field">
-            <span>Seletor do video</span>
-            <input id="videoSelector" type="text" autocomplete="off" />
-          </label>
-
-          <label class="field">
-            <span>Espera pelo proximo</span>
-            <input id="autoAdvanceWaitMs" type="number" min="1000" step="500" />
-          </label>
-
-          <label class="field">
-            <span>Intervalo</span>
-            <input id="pollIntervalMs" type="number" min="250" step="250" />
-          </label>
-
-          <label class="field">
-            <span>Tempo sem video</span>
-            <input id="nonVideoWaitMs" type="number" min="5000" step="5000" />
-          </label>
-        </div>
-
-        <div class="speed-row">
-          <label class="field speed-field">
-            <span>Velocidade</span>
-            <input id="playbackRate" type="range" min="0.25" max="4" step="0.25" />
-          </label>
-          <strong id="speedValue">1.00x</strong>
-        </div>
-
-        <label class="check-row">
-          <input id="useExistingBrowser" type="checkbox" />
-          <span>Usar aba nova no Brave ja aberto</span>
-        </label>
-
-        <label class="check-row">
-          <input id="stopOnAssessment" type="checkbox" />
-          <span>Pausar quando detectar prova ou quiz</span>
-        </label>
-
-        <label class="check-row">
-          <input id="autoAdvanceNonVideo" type="checkbox" />
-          <span>Avancar conteudo sem video apos espera</span>
-        </label>
-
-        <div class="button-row">
-          <button id="checkBrave" class="secondary" type="button">Verificar Brave</button>
-          <button id="openBrave" class="secondary" type="button">Abrir Brave CDP</button>
-          <button id="startBot" class="primary" type="button">Iniciar</button>
-          <button id="stopBot" class="danger" type="button" disabled>Parar</button>
-        </div>
-      </section>
-
-      <section class="monitor-panel">
-        <div class="metrics-grid">
+        <section id="session" class="metrics-grid">
           <article class="metric">
             <span>Conexao</span>
             <strong id="connectionStatus">Nao verificada</strong>
@@ -121,32 +57,119 @@
             <span>Status</span>
             <strong id="botStatus">Parado</strong>
           </article>
-        </div>
+        </section>
 
-        <div class="assessment-panel" id="assessmentPanel">
-          <div>
-            <span>Avaliacao</span>
-            <strong id="assessmentTitle">Nenhuma prova detectada</strong>
-            <small id="assessmentUrl">-</small>
+        <section class="session-card">
+          <div class="current-video">
+            <div>
+              <span>Item atual</span>
+              <strong id="currentTitle">Nenhum video monitorado</strong>
+              <small id="currentUrl">-</small>
+            </div>
+            <div class="time-readout" id="timeReadout">00:00 / 00:00</div>
           </div>
-          <span id="assessmentConfidence">0</span>
-        </div>
-
-        <div class="current-video">
-          <div>
-            <span>Video atual</span>
-            <strong id="currentTitle">Nenhum video monitorado</strong>
-            <small id="currentUrl">-</small>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-fill"></div>
           </div>
-          <div class="time-readout" id="timeReadout">00:00 / 00:00</div>
-        </div>
+        </section>
 
-        <div class="progress-track">
-          <div id="progressBar" class="progress-fill"></div>
-        </div>
+        <section id="settings" class="settings-panel">
+          <div class="panel-heading">
+            <div>
+              <span>Configuracao</span>
+              <strong>Preset e navegador</strong>
+            </div>
+            <div class="button-row compact">
+              <button id="importSettings" class="ghost" type="button">Importar</button>
+              <button id="exportSettings" class="ghost" type="button">Exportar</button>
+              <button id="diagnosticButton" class="ghost" type="button">Diagnostico</button>
+            </div>
+          </div>
 
-        <div class="insight-grid">
-          <section class="history-panel">
+          <div class="form-grid">
+            <label class="field field-wide">
+              <span>Preset</span>
+              <select id="platformPreset"></select>
+            </label>
+
+            <label class="field field-wide">
+              <span>URL do curso ou video</span>
+              <input id="startUrl" type="url" placeholder="https://www.coursera.org/..." autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span>CDP do Brave</span>
+              <input id="browserCdpUrl" type="text" autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span>Caminho do Brave</span>
+              <input id="browserExecutablePath" type="text" autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span>Seletor do video</span>
+              <input id="videoSelector" type="text" autocomplete="off" />
+            </label>
+
+            <label class="field">
+              <span>Espera proximo</span>
+              <input id="autoAdvanceWaitMs" type="number" min="1000" step="500" />
+            </label>
+
+            <label class="field">
+              <span>Intervalo</span>
+              <input id="pollIntervalMs" type="number" min="250" step="250" />
+            </label>
+
+            <label class="field">
+              <span>Tempo sem video</span>
+              <input id="nonVideoWaitMs" type="number" min="5000" step="5000" />
+            </label>
+          </div>
+
+          <div class="speed-row">
+            <label class="field speed-field">
+              <span>Velocidade</span>
+              <input id="playbackRate" type="range" min="0.25" max="4" step="0.25" />
+            </label>
+            <strong id="speedValue">1.00x</strong>
+          </div>
+
+          <div class="toggle-grid">
+            <label class="check-row">
+              <input id="useExistingBrowser" type="checkbox" />
+              <span>Usar aba nova no Brave ja aberto</span>
+            </label>
+
+            <label class="check-row">
+              <input id="stopOnAssessment" type="checkbox" />
+              <span>Pausar em prova ou quiz</span>
+            </label>
+
+            <label class="check-row">
+              <input id="autoAdvanceNonVideo" type="checkbox" />
+              <span>Avancar conteudo sem video</span>
+            </label>
+
+            <label class="check-row">
+              <input id="simulationMode" type="checkbox" />
+              <span>Modo simulacao</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="insight-grid">
+          <section class="assessment-panel" id="assessmentPanel">
+            <div>
+              <span>Avaliacao</span>
+              <strong id="assessmentTitle">Nenhuma prova detectada</strong>
+              <small id="assessmentUrl">-</small>
+            </div>
+            <span id="assessmentConfidence">0</span>
+          </section>
+
+          <section id="history" class="history-panel">
             <div class="panel-title">
               <span>Historico</span>
               <strong id="historySummary">0 aulas</strong>
@@ -163,13 +186,15 @@
             <ul id="studyChecklist" class="compact-list"></ul>
             <ul id="studyPrompts" class="compact-list prompt-list"></ul>
           </section>
-        </div>
+        </section>
 
-        <div class="log-header">
-          <span>Eventos</span>
-          <button id="clearLog" class="ghost" type="button">Limpar</button>
-        </div>
-        <pre id="eventLog" class="event-log"></pre>
+        <section id="events" class="event-panel">
+          <div class="log-header">
+            <span>Timeline</span>
+            <button id="clearLog" class="ghost" type="button">Limpar</button>
+          </div>
+          <ol id="eventLog" class="event-log"></ol>
+        </section>
       </section>
     </main>
 

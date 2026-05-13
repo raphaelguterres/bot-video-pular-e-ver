@@ -1,6 +1,6 @@
 {
   "name": "bot-video-pular-e-ver",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Aplicativo desktop para detectar o fim de videos em cursos e avancar automaticamente.",
   "author": "Local",
   "main": "src/electron/main.js",
@@ -8,6 +8,9 @@
     "start": "electron .",
     "cli": "node src/bot.js",
     "cli:headed": "HEADLESS=false node src/bot.js",
+    "test": "node scripts/run-tests.js",
+    "lint": "node scripts/lint.js",
+    "format": "node scripts/format-check.js",
     "brave:debug": "powershell -ExecutionPolicy Bypass -File scripts/open-brave-debug.ps1",
     "build": "electron-builder",
     "build:win": "electron-builder --win",

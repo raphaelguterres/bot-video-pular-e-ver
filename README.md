@@ -1,21 +1,24 @@
 # Video Course Bot
 
-Aplicativo desktop para abrir uma aba no Brave via CDP, monitorar o elemento `<video>`, controlar velocidade e avancar automaticamente quando a aula termina.
+App desktop em Electron + Playwright para acompanhar aulas em video, controlar velocidade, detectar fim do video e avancar para o proximo item usando Brave via CDP.
 
 ## Recursos
 
-- Input para colar URL do video ou curso.
-- Preset Coursera para seletores e deteccao de avaliacoes.
-- Historico de sessoes, aulas vistas e avaliacoes detectadas.
-- Modo Estudo com checklist e perguntas de revisao baseadas nas aulas vistas.
-- Interface separada para acompanhar status, progresso e eventos.
+- Interface desktop com sidebar, status de sessao, timeline, historico e modo estudo.
+- Preset Coursera e fallback generico por adapters em `src/platforms`.
+- Compatibilidade com Brave/Chrome via CDP em uma aba nova do navegador ja aberto.
 - Controle de velocidade de reproducao.
-- Deteccao de fim do video e tentativa de avancar para o proximo.
-- Avanco de conteudos sem video, como leituras e cenarios praticos, apos espera configuravel.
-- Deteccao de fim do curso quando nao existe proxima aula.
-- Deteccao de prova/quiz com pausa da automacao.
-- Compatibilidade com Brave via CDP.
-- Build para Windows, Linux e macOS com Electron Builder.
+- Avanco automatico quando o video termina.
+- Tratamento de conteudos sem video com espera configuravel.
+- Pausa automatica ao detectar prova, quiz ou assessment.
+- Modo simulacao para detectar o proximo passo sem clicar.
+- Import/export de configuracoes.
+- Diagnostico com settings sanitizados e eventos recentes.
+- Build cross-platform com Electron Builder.
+
+## Uso Seguro
+
+Este projeto nao automatiza respostas de provas, quizzes, assignments ou avaliacoes. Ao detectar uma avaliacao, o bot pausa a automacao e exibe um aviso. Use a ferramenta para organizar acompanhamento de aulas e progresso de estudo, respeitando as regras da plataforma.
 
 ## Instalar
 
@@ -23,21 +26,21 @@ Aplicativo desktop para abrir uma aba no Brave via CDP, monitorar o elemento `<v
 npm install
 ```
 
-## Rodar com interface
+## Rodar em desenvolvimento
 
 ```powershell
 npm start
 ```
 
-## Usar o Brave atual
+## Abrir Brave com CDP
 
-O Brave precisa estar aberto com a porta de depuracao remota ativa. O app tem o botao "Abrir Brave CDP", mas se o Brave ja estiver aberto sem CDP, feche todas as janelas antes.
+Se o Brave ja estiver aberto sem CDP, feche todas as janelas antes.
 
 ```powershell
 npm run brave:debug
 ```
 
-Depois abra o app:
+Depois rode:
 
 ```powershell
 npm start
@@ -49,28 +52,47 @@ npm start
 npm run cli
 ```
 
-## Build
+## Testes e qualidade
 
 ```powershell
+npm run lint
+npm test
+npm run format
+```
+
+## Builds locais
+
+```powershell
+npm run build
 npm run build:win
 npm run build:win:portable
 npm run build:linux
 npm run build:mac
 ```
 
-Os artefatos saem na pasta `dist`. O comando `build:win` gera o instalador Windows; `build:win:portable` gera o executavel portatil. Para macOS, o build precisa rodar em macOS; para Linux, rode em Linux ou em CI com ambiente Linux.
+Os artefatos ficam em `dist/`. Builds macOS devem rodar em macOS; builds Linux devem rodar em Linux ou CI Linux.
 
-## Configuracoes
+## Configuracao
 
-- `startUrl`: URL inicial do video ou curso.
-- `platformPreset`: preset de plataforma, como `coursera` ou `custom`.
-- `useExistingBrowser`: cria uma aba nova no Brave conectado por CDP.
-- `browserCdpUrl`: endereco da porta CDP, normalmente `http://127.0.0.1:9222`.
-- `browserExecutablePath`: caminho do Brave.
-- `videoSelector`: seletor CSS do player, normalmente `video`.
-- `playbackRate`: velocidade inicial.
+Use a interface ou `config.json` local. `config.json` nao deve ser versionado.
+
+- `startUrl`: URL inicial do curso ou video.
+- `platformPreset`: `coursera` ou `custom`.
+- `useExistingBrowser`: cria aba nova no Brave conectado por CDP.
+- `browserCdpUrl`: normalmente `http://127.0.0.1:9222`.
+- `browserExecutablePath`: caminho local do Brave.
+- `videoSelector`: seletor CSS do player.
+- `playbackRate`: velocidade inicial entre `0.25` e `4`.
 - `stopOnAssessment`: pausa quando detectar prova, quiz ou avaliacao.
-- `autoAdvanceWaitMs`: tempo de espera para troca automatica.
-- `autoAdvanceNonVideo`: avanca conteudos sem video apos uma espera.
-- `nonVideoWaitMs`: tempo minimo de permanencia em conteudos sem video.
-- `nextButtonSelectors`: seletores de botao/link de proxima aula.
+- `simulationMode`: detecta a acao sem clicar.
+- `autoAdvanceNonVideo`: avanca conteudos sem video apos espera.
+- `nonVideoWaitMs`: tempo minimo em conteudos sem video.
+- `nextButtonSelectors`: seletores de proxima aula.
+- `completionButtonSelectors`: seletores de conclusao de conteudo sem video.
+
+## Documentacao
+
+- [Arquitetura](docs/architecture.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Release](RELEASE.md)
+- [Changelog](CHANGELOG.md)

@@ -73,6 +73,7 @@ const DEFAULT_CONFIG = {
   videoSelector: "video",
   playbackRate: 1,
   stopOnAssessment: true,
+  simulationMode: false,
   assessmentKeywords: DEFAULT_ASSESSMENT_KEYWORDS,
   nextButtonSelectors: DEFAULT_NEXT_BUTTON_SELECTORS,
   completionButtonSelectors: DEFAULT_COMPLETION_BUTTON_SELECTORS,

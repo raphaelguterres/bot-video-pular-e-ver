@@ -11,6 +11,7 @@ const form = {
   useExistingBrowser: document.getElementById("useExistingBrowser"),
   stopOnAssessment: document.getElementById("stopOnAssessment"),
   autoAdvanceNonVideo: document.getElementById("autoAdvanceNonVideo"),
+  simulationMode: document.getElementById("simulationMode"),
 };
 
 const ui = {
@@ -40,6 +41,10 @@ const ui = {
   startBot: document.getElementById("startBot"),
   stopBot: document.getElementById("stopBot"),
   clearLog: document.getElementById("clearLog"),
+  importSettings: document.getElementById("importSettings"),
+  exportSettings: document.getElementById("exportSettings"),
+  diagnosticButton: document.getElementById("diagnosticButton"),
+  themeToggle: document.getElementById("themeToggle"),
 };
 
 let running = false;
@@ -58,6 +63,7 @@ function collectSettings() {
     useExistingBrowser: form.useExistingBrowser.checked,
     stopOnAssessment: form.stopOnAssessment.checked,
     autoAdvanceNonVideo: form.autoAdvanceNonVideo.checked,
+    simulationMode: form.simulationMode.checked,
     headless: false,
   };
 }
@@ -75,6 +81,7 @@ function applySettings(settings) {
   form.useExistingBrowser.checked = Boolean(settings.useExistingBrowser);
   form.stopOnAssessment.checked = settings.stopOnAssessment !== false;
   form.autoAdvanceNonVideo.checked = settings.autoAdvanceNonVideo !== false;
+  form.simulationMode.checked = Boolean(settings.simulationMode);
   updateSpeedValue();
 }
 
@@ -116,7 +123,6 @@ function statusLabel(status) {
     waiting_video: "Aguardando",
     reading: "Leitura",
     advancing: "Avancando",
-    stopping: "Parando",
     stopped: "Parado",
     finished: "Finalizado",
     assessment: "Avaliacao",
@@ -143,7 +149,16 @@ function formatTime(seconds) {
 
 function appendLog(message, level = "info") {
   const time = new Date().toLocaleTimeString();
-  ui.eventLog.textContent += `[${time}] ${level.toUpperCase()} ${message}\n`;
+  const li = document.createElement("li");
+  const timeNode = document.createElement("span");
+  const levelNode = document.createElement("strong");
+  const messageNode = document.createElement("span");
+  timeNode.textContent = time;
+  levelNode.textContent = level.toUpperCase();
+  levelNode.className = `level-${level}`;
+  messageNode.textContent = message;
+  li.append(timeNode, levelNode, messageNode);
+  ui.eventLog.appendChild(li);
   ui.eventLog.scrollTop = ui.eventLog.scrollHeight;
 }
 
@@ -232,7 +247,7 @@ function handleBotEvent(event) {
   }
 
   if (event.type === "log") {
-    appendLog(event.message, event.level);
+    appendLog(event.message, event.level || "info");
     return;
   }
 
@@ -257,6 +272,11 @@ function handleBotEvent(event) {
 
   if (event.type === "next-video") {
     appendLog(`Proximo video: ${event.title || event.url}`, "info");
+    return;
+  }
+
+  if (event.type === "simulation-step") {
+    appendLog(`Simulacao: acao detectada em ${event.selector}`, "info");
     return;
   }
 
@@ -288,6 +308,11 @@ function handleBotEvent(event) {
 }
 
 async function boot() {
+  if (localStorage.getItem("videoBotTheme") === "dark") {
+    document.body.classList.add("dark");
+    ui.themeToggle.textContent = "Tema claro";
+  }
+
   const presets = await window.videoBot.listPresets();
   populatePresets(presets);
   const settings = await window.videoBot.getSettings();
@@ -346,6 +371,33 @@ form.playbackRate.addEventListener("input", async () => {
 
 ui.clearLog.addEventListener("click", () => {
   ui.eventLog.textContent = "";
+});
+
+ui.importSettings.addEventListener("click", async () => {
+  const result = await window.videoBot.importSettings();
+  if (!result.canceled && result.settings) {
+    applySettings(result.settings);
+    appendLog("Configuracoes importadas.", "info");
+  }
+});
+
+ui.exportSettings.addEventListener("click", async () => {
+  const result = await window.videoBot.exportSettings();
+  if (!result.canceled) {
+    appendLog(`Configuracoes exportadas: ${result.filePath}`, "info");
+  }
+});
+
+ui.diagnosticButton.addEventListener("click", async () => {
+  const result = await window.videoBot.generateDiagnostic();
+  appendLog(`Diagnostico gerado: ${result.filePath}`, "info");
+});
+
+ui.themeToggle.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+  const dark = document.body.classList.contains("dark");
+  ui.themeToggle.textContent = dark ? "Tema claro" : "Tema escuro";
+  localStorage.setItem("videoBotTheme", dark ? "dark" : "light");
 });
 
 boot().catch((error) => {

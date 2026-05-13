@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        run: npm run build:win
+
+      - name: Build Windows portable
+        if: runner.os == 'Windows'
+        run: npm run build:win:portable
+
+      - name: Build Linux
+        if: runner.os == 'Linux'
+        run: npm run build:linux
+
+      - name: Build macOS
+        if: runner.os == 'macOS'
+        run: npm run build:mac
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-course-bot-${{ runner.os }}
+          path: |
+            dist/**
+          if-no-files-found: error

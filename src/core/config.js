@@ -73,6 +73,7 @@ function normalizeConfig(input = {}, env = process.env) {
     ),
     playbackRate: readClampedNumber(presetInput.playbackRate, DEFAULT_CONFIG.playbackRate, 0.25, 4),
     stopOnAssessment: readBoolean(presetInput.stopOnAssessment, DEFAULT_CONFIG.stopOnAssessment),
+    simulationMode: readBoolean(presetInput.simulationMode, DEFAULT_CONFIG.simulationMode),
     browserCdpUrl: env.BROWSER_CDP_URL || presetInput.browserCdpUrl || DEFAULT_CONFIG.browserCdpUrl,
     browserExecutablePath,
     browserChannel,

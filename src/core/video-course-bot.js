@@ -1,16 +1,16 @@
 const fs = require("fs");
 const EventEmitter = require("events");
 const { chromium } = require("playwright");
+const { getPlatformAdapter } = require("../platforms");
+const { BotStateMachine } = require("./bot-state");
 const { getBraveDebugCommand, getCdpStatus } = require("./brave");
 const { normalizeConfig } = require("./config");
+const { retry, sleep } = require("./retry");
 const { buildStudyGuide } = require("./study-guide");
+const { assertValidConfig, assertValidPlaybackRate } = require("./validation");
 
 const BRAVE_ALREADY_RUNNING_HINT =
   "Se o Brave ja estava aberto, esse comando nao ativa a porta no processo existente. Feche todas as janelas do Brave e confirme se nao sobrou brave.exe no Gerenciador de Tarefas antes de abrir de novo.";
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function formatSeconds(ms) {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -82,22 +82,12 @@ function hasVideoChanged(before, after) {
   );
 }
 
-function createAssessmentPattern(keywords) {
-  const escaped = keywords
-    .filter(Boolean)
-    .map((keyword) => String(keyword).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-  if (escaped.length === 0) {
-    return /$a/i;
-  }
-
-  return new RegExp(`(${escaped.join("|")})`, "i");
-}
-
 class VideoCourseBot extends EventEmitter {
   constructor(initialConfig = {}, options = {}) {
     super();
     this.config = normalizeConfig(initialConfig);
+    this.adapter = getPlatformAdapter(this.config.platformPreset);
+    this.stateMachine = new BotStateMachine();
     this.historyStore = options.historyStore || null;
     this.historySessionId = null;
     this.browser = null;
@@ -129,11 +119,38 @@ class VideoCourseBot extends EventEmitter {
   }
 
   emitStatus(status, message, extra = {}) {
-    this.emitEvent("status", { status, message, ...extra });
+    this.stateMachine.transition(status, { message });
+    this.emitEvent("status", {
+      status,
+      state: this.stateMachine.state,
+      message,
+      ...extra,
+    });
   }
 
-  emitLog(message, level = "info", extra = {}) {
-    this.emitEvent("log", { level, message, ...extra });
+  emitLog(message, level = "info", context = {}) {
+    this.emitEvent("log", {
+      level,
+      logType: context.type || "runtime",
+      message,
+      context: this.sanitizeContext(context),
+    });
+  }
+
+  sanitizeContext(context = {}) {
+    const sanitized = {};
+    const home = process.env.USERPROFILE || process.env.HOME || "";
+
+    for (const [key, value] of Object.entries(context)) {
+      if (value === undefined || value === null || key === "stack") {
+        continue;
+      }
+
+      const textValue = String(value);
+      sanitized[key] = home ? textValue.replaceAll(home, "~") : textValue;
+    }
+
+    return sanitized;
   }
 
   async start(options = {}) {
@@ -142,9 +159,9 @@ class VideoCourseBot extends EventEmitter {
     }
 
     this.config = normalizeConfig({ ...this.config, ...options });
-    if (!this.config.startUrl || this.config.startUrl.includes("exemplo.com")) {
-      throw new Error("Informe a URL inicial do video ou curso.");
-    }
+    assertValidConfig(this.config);
+    this.adapter = getPlatformAdapter(this.config.platformPreset);
+    this.stateMachine.reset();
 
     this.handledEndedCount = 0;
     this.handledVideoKeys = new Set();
@@ -192,7 +209,15 @@ class VideoCourseBot extends EventEmitter {
       });
 
       this.emitStatus("opening", `Abrindo ${this.config.startUrl}`);
-      await this.page.goto(this.config.startUrl, { waitUntil: "domcontentloaded" });
+      await retry(
+        () => this.page.goto(this.config.startUrl, { waitUntil: "domcontentloaded" }),
+        {
+          retries: 2,
+          delayMs: 1000,
+          timeoutMs: 45000,
+          timeoutMessage: "A pagina demorou demais para abrir.",
+        }
+      );
       await this.applyPlaybackRate();
 
       this.emitStatus("running", "Monitorando video...");
@@ -221,7 +246,7 @@ class VideoCourseBot extends EventEmitter {
 
   async stop() {
     this.running = false;
-    this.emitStatus("stopping", "Parando bot...");
+    this.emitLog("Parando bot...", "info", { type: "lifecycle" });
     if (this.historyStore && this.historySessionId) {
       this.historyStore.finishSession(this.historySessionId, "stopped");
       this.emitHistoryUpdate();
@@ -245,10 +270,7 @@ class VideoCourseBot extends EventEmitter {
   }
 
   async setSpeed(playbackRate) {
-    const parsedRate = Number(playbackRate);
-    if (!Number.isFinite(parsedRate) || parsedRate < 0.25 || parsedRate > 4) {
-      throw new Error("A velocidade precisa estar entre 0.25x e 4x.");
-    }
+    const parsedRate = assertValidPlaybackRate(playbackRate);
 
     this.config.playbackRate = parsedRate;
     await this.applyPlaybackRate();
@@ -272,7 +294,12 @@ class VideoCourseBot extends EventEmitter {
         );
       }
 
-      const browser = await chromium.connectOverCDP(this.config.browserCdpUrl);
+      const browser = await retry(() => chromium.connectOverCDP(this.config.browserCdpUrl), {
+        retries: 2,
+        delayMs: 700,
+        timeoutMs: 15000,
+        timeoutMessage: "A conexao CDP demorou demais para responder.",
+      });
       const context = browser.contexts()[0] || (await browser.newContext());
       const page = await context.newPage();
       return { browser, page, ownsBrowser: false };
@@ -285,24 +312,36 @@ class VideoCourseBot extends EventEmitter {
         throw new Error(`Navegador nao encontrado em: ${this.config.browserExecutablePath}`);
       }
 
-      const browser = await chromium.launch({
-        ...launchOptions,
-        executablePath: this.config.browserExecutablePath,
-      });
+      const browser = await retry(
+        () =>
+          chromium.launch({
+            ...launchOptions,
+            executablePath: this.config.browserExecutablePath,
+          }),
+        { retries: 1, delayMs: 800, timeoutMs: 30000 }
+      );
       const page = await browser.newPage();
       return { browser, page, ownsBrowser: true };
     }
 
     if (this.config.browserChannel) {
-      const browser = await chromium.launch({
-        ...launchOptions,
-        channel: this.config.browserChannel,
-      });
+      const browser = await retry(
+        () =>
+          chromium.launch({
+            ...launchOptions,
+            channel: this.config.browserChannel,
+          }),
+        { retries: 1, delayMs: 800, timeoutMs: 30000 }
+      );
       const page = await browser.newPage();
       return { browser, page, ownsBrowser: true };
     }
 
-    const browser = await chromium.launch(launchOptions);
+    const browser = await retry(() => chromium.launch(launchOptions), {
+      retries: 1,
+      delayMs: 800,
+      timeoutMs: 30000,
+    });
     const page = await browser.newPage();
     return { browser, page, ownsBrowser: true };
   }
@@ -418,6 +457,17 @@ class VideoCourseBot extends EventEmitter {
         return;
       }
 
+      if (this.config.simulationMode) {
+        this.emitEvent("simulation-step", {
+          selector: clickedSelector,
+          title: state.pageTitle,
+          url: state.pageUrl,
+        });
+        this.emitLog(`Simulacao: clicaria no proximo usando ${clickedSelector}`);
+        await this.finishCourse("Simulacao concluida: proximo passo detectado sem clicar.");
+        return;
+      }
+
       this.emitLog(`Cliquei no proximo usando: ${clickedSelector}`);
       await this.page.waitForLoadState("domcontentloaded").catch(() => {});
 
@@ -487,11 +537,17 @@ class VideoCourseBot extends EventEmitter {
 
     const clickedCompletionSelector = await this.clickCompletionButton();
     if (clickedCompletionSelector) {
-      this.emitLog(`Conclui conteudo usando: ${clickedCompletionSelector}`);
+      this.emitLog(
+        this.config.simulationMode
+          ? `Simulacao: marcaria conteudo usando ${clickedCompletionSelector}`
+          : `Conclui conteudo usando: ${clickedCompletionSelector}`
+      );
     }
 
-    this.recordLessonComplete(lessonKey);
-    this.handledNonVideoKeys.add(lessonKey);
+    if (!this.config.simulationMode) {
+      this.recordLessonComplete(lessonKey);
+      this.handledNonVideoKeys.add(lessonKey);
+    }
     this.activeNonVideoKey = null;
     this.nonVideoStartedAt = 0;
     this.lastNonVideoStatusKey = null;
@@ -503,8 +559,29 @@ class VideoCourseBot extends EventEmitter {
       return;
     }
 
+    if (this.config.simulationMode) {
+      this.emitEvent("simulation-step", {
+        selector: clickedSelector,
+        title: state.pageTitle || state.title,
+        url: state.pageUrl || state.url,
+      });
+      this.emitLog(`Simulacao: clicaria no proximo usando ${clickedSelector}`);
+      await this.finishCourse("Simulacao concluida: proximo conteudo detectado sem clicar.");
+      return;
+    }
+
     this.emitLog(`Cliquei no proximo usando: ${clickedSelector}`);
     await this.page.waitForLoadState("domcontentloaded").catch(() => {});
+    const changedState = await this.waitForLessonChange(state);
+    if (!changedState) {
+      const assessment = await this.getAssessmentState();
+      if (assessment.found && this.config.stopOnAssessment) {
+        await this.pauseForAssessment(assessment);
+        return;
+      }
+
+      await this.finishCourse("Cliquei no proximo, mas nenhum novo item foi detectado.");
+    }
   }
 
   async finishCourse(message) {
@@ -646,159 +723,15 @@ class VideoCourseBot extends EventEmitter {
   }
 
   async getVideoState() {
-    return this.page.evaluate((selector) => {
-      const video = document.querySelector(selector);
-
-      if (!video) {
-        return {
-          found: false,
-          pageUrl: location.href,
-          pageTitle: document.title,
-        };
-      }
-
-      return {
-        found: true,
-        ended: video.ended,
-        paused: video.paused,
-        currentTime: video.currentTime,
-        duration: Number.isFinite(video.duration) ? video.duration : null,
-        src: video.currentSrc || video.src || null,
-        pageUrl: location.href,
-        pageTitle: document.title,
-      };
-    }, this.config.videoSelector);
+    return this.adapter.detectVideo(this.page, this.config.videoSelector);
   }
 
   async getLessonPageState() {
-    return this.page.evaluate(() => {
-      const url = location.href;
-      const title = document.title;
-      const pathname = location.pathname.toLowerCase();
-      const isCoursera = location.hostname.includes("coursera.org");
-      const isCourseraLecture = isCoursera && pathname.includes("/lecture/");
-      const isCourseraContent =
-        isCoursera &&
-        pathname.includes("/learn/") &&
-        /(\/supplement\/|\/reading\/|\/ungradedwidget\/|\/item\/)/i.test(pathname);
-
-      return {
-        found: isCourseraLecture || isCourseraContent,
-        contentType: isCourseraLecture ? "video" : "content",
-        pageUrl: url,
-        pageTitle: title,
-        title,
-        url,
-        duration: null,
-        src: null,
-      };
-    });
+    return this.adapter.detectLesson(this.page);
   }
 
   async getAssessmentState() {
-    const keywords = this.config.assessmentKeywords || [];
-    const keywordPattern = createAssessmentPattern(keywords);
-
-    return this.page.evaluate(
-      ({ patternSource, patternFlags }) => {
-        const keywordPattern = new RegExp(patternSource, patternFlags);
-        const url = location.href;
-        const title = document.title;
-        const hostname = location.hostname.toLowerCase();
-        const pathname = location.pathname.toLowerCase();
-        const isCoursera = hostname.includes("coursera.org");
-        const isCourseraLecture = isCoursera && pathname.includes("/lecture/");
-        const isAssessmentPath =
-          /(\/quiz\/|\/exam\/|\/assignment|\/peer|\/review|\/programming)/i.test(pathname);
-        const strongAssessmentPattern =
-          /(graded quiz|practice quiz|module quiz|quiz|exam|assessment|assignment|prova|avaliacao|avaliação|questionario|questionário)/i;
-
-        const headingText = Array.from(document.querySelectorAll("h1,h2,[role='heading']"))
-          .slice(0, 8)
-          .map((element) => element.textContent || "")
-          .join(" ");
-        const isVisible = (element) => {
-          const style = window.getComputedStyle(element);
-          const rect = element.getBoundingClientRect();
-          return (
-            style.visibility !== "hidden" &&
-            style.display !== "none" &&
-            rect.width > 0 &&
-            rect.height > 0
-          );
-        };
-        const buttonText = Array.from(document.querySelectorAll("button,a"))
-          .filter(isVisible)
-          .slice(0, 80)
-          .map((element) => element.textContent || element.getAttribute("aria-label") || "")
-          .join(" ");
-        const bodyText = (document.body?.innerText || "").slice(0, 6000);
-        const radioCount = Array.from(document.querySelectorAll("input[type='radio']")).filter(
-          isVisible
-        ).length;
-        const checkboxCount = Array.from(
-          document.querySelectorAll("input[type='checkbox']")
-        ).filter(isVisible).length;
-        const textAreaCount = Array.from(document.querySelectorAll("textarea")).filter(
-          isVisible
-        ).length;
-        const formCount = Array.from(document.querySelectorAll("form")).filter(isVisible).length;
-        const submitLike = /(submit|enviar|concluir|start|iniciar|fazer|retomar|resume)/i.test(
-          buttonText
-        );
-        const answerControls = radioCount + checkboxCount + textAreaCount;
-        const titleOrHeading = `${title} ${headingText}`;
-        const reasons = [];
-        let confidence = 0;
-
-        if (isCourseraLecture && !isAssessmentPath) {
-          return {
-            found: false,
-            confidence: 0,
-            reasons: ["coursera_lecture"],
-            title,
-            url,
-            answerControls,
-          };
-        }
-
-        if (isAssessmentPath || strongAssessmentPattern.test(pathname)) {
-          confidence += 3;
-          reasons.push("url");
-        }
-
-        if (
-          strongAssessmentPattern.test(titleOrHeading) ||
-          (keywordPattern.test(titleOrHeading) && answerControls > 0)
-        ) {
-          confidence += 2;
-          reasons.push("titulo");
-        }
-
-        if (!isCourseraLecture && strongAssessmentPattern.test(bodyText)) {
-          confidence += 1;
-          reasons.push("conteudo");
-        }
-
-        if (answerControls > 0 && (submitLike || formCount > 0)) {
-          confidence += 2;
-          reasons.push("campos_de_resposta");
-        }
-
-        return {
-          found: confidence >= 3,
-          confidence,
-          reasons,
-          title,
-          url,
-          answerControls,
-        };
-      },
-      {
-        patternSource: keywordPattern.source,
-        patternFlags: keywordPattern.flags,
-      }
-    );
+    return this.adapter.detectAssessment(this.page, this.config);
   }
 
   async waitForVideoChange(previousState) {
@@ -817,51 +750,35 @@ class VideoCourseBot extends EventEmitter {
     return null;
   }
 
-  async clickNextButton() {
-    for (const selector of this.config.nextButtonSelectors) {
-      const locator = this.page.locator(selector).first();
+  async waitForLessonChange(previousState) {
+    const timeoutAt = Date.now() + this.config.autoAdvanceWaitMs;
+    const previousLessonKey = getLessonKey(previousState);
 
-      try {
-        if ((await locator.count()) === 0 || !(await locator.isVisible())) {
-          continue;
-        }
+    while (this.running && Date.now() < timeoutAt) {
+      await sleep(this.config.pollIntervalMs);
+      const videoState = await this.getVideoState();
 
-        if (await locator.isDisabled().catch(() => false)) {
-          continue;
-        }
+      if (videoState.found && hasVideoChanged(previousState, videoState)) {
+        await this.applyPlaybackRate();
+        return videoState;
+      }
 
-        await locator.click();
-        return selector;
-      } catch {
-        // Some pages replace controls while we inspect them. Try the next selector.
+      const lessonState = await this.getLessonPageState();
+      const lessonKey = getLessonKey(lessonState);
+      if (lessonState.found && lessonKey && lessonKey !== previousLessonKey) {
+        return lessonState;
       }
     }
 
     return null;
   }
 
+  async clickNextButton() {
+    return this.adapter.clickNext(this.page, this.config);
+  }
+
   async clickCompletionButton() {
-    for (const selector of this.config.completionButtonSelectors || []) {
-      const locator = this.page.locator(selector).first();
-
-      try {
-        if ((await locator.count()) === 0 || !(await locator.isVisible())) {
-          continue;
-        }
-
-        if (await locator.isDisabled().catch(() => false)) {
-          continue;
-        }
-
-        await locator.click();
-        await sleep(800);
-        return selector;
-      } catch {
-        // Completion controls can be rerendered while the page settles.
-      }
-    }
-
-    return null;
+    return this.adapter.clickCompletion(this.page, this.config);
   }
 
   async ensureVideoListener() {
